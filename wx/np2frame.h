@@ -85,6 +85,10 @@ enum {
 	ID_SCREEN_X1,
 	ID_SCREEN_X2,
 	ID_SCREEN_X3,
+	ID_SCREEN_X4,
+	ID_SCREEN_X5,
+	ID_SCREEN_ZOOM_IN,
+	ID_SCREEN_ZOOM_OUT,
 	ID_SCREEN_FULL,
 
 	/* Other */
@@ -110,6 +114,8 @@ public:
 	Np2Panel *GetPanel(void) { return m_panel; }
 	bool IsRunning(void)     const { return m_running; }
 	void ToggleFullScreen(void);
+	void SetScreenScale(int mul);
+	void StepScreenScale(int dir);
 	void StartEmulation(void);
 	void StopEmulation(void);
 
@@ -167,6 +173,10 @@ private:
 	void OnScreenX1(wxCommandEvent &evt);
 	void OnScreenX2(wxCommandEvent &evt);
 	void OnScreenX3(wxCommandEvent &evt);
+	void OnScreenX4(wxCommandEvent &evt);
+	void OnScreenX5(wxCommandEvent &evt);
+	void OnScreenZoomIn(wxCommandEvent &evt);
+	void OnScreenZoomOut(wxCommandEvent &evt);
 	void OnScreenFull(wxCommandEvent &evt);
 
 	void OnOtherCopyScreen(wxCommandEvent &evt);

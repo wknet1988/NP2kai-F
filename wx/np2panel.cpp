@@ -33,6 +33,7 @@ wxEND_EVENT_TABLE()
 Np2Panel::Np2Panel(wxWindow *parent)
 	: wxPanel(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize,
 	          wxWANTS_CHARS | wxTAB_TRAVERSAL)
+	, m_scaledMul(0)
 	, m_mouseCaptured(false)
 {
 	SetBackgroundStyle(wxBG_STYLE_PAINT);
@@ -102,14 +103,16 @@ void Np2Panel::UpdateScreen(void)
 	 *   0x30 = SCRNMODE_ROTATERIGHT (90° CW) */
 	UINT8 rot = scrnmode & SCRNMODE_ROTATEMASK;
 	if (rot == SCRNMODE_ROTATELEFT) {
-		m_bitmap = wxBitmap(m_image.Rotate90(false));   /* 90° CCW */
+		m_dispImage = m_image.Rotate90(false);   /* 90 deg CCW */
 	} else if (rot == SCRNMODE_ROTATERIGHT) {
-		m_bitmap = wxBitmap(m_image.Rotate90(true));    /* 90° CW */
+		m_dispImage = m_image.Rotate90(true);    /* 90 deg CW */
 	} else if (rot == 0x20) {
-		m_bitmap = wxBitmap(m_image.Rotate90(true).Rotate90(true)); /* 180° */
+		m_dispImage = m_image.Rotate90(true).Rotate90(true); /* 180 deg */
 	} else {
-		m_bitmap = wxBitmap(m_image);
+		m_dispImage = m_image;
 	}
+	m_bitmap = wxBitmap(m_dispImage);
+	m_scaledMul = 0;                             /* invalidate scale cache */
 
 	Refresh(false);
 }
@@ -131,17 +134,40 @@ void Np2Panel::OnPaint(wxPaintEvent & /*evt*/)
 	}
 	int pw = GetClientSize().x;
 	int ph = GetClientSize().y;
-	if (pw > 0 && ph > 0) {
-		int bw = m_bitmap.GetWidth();
-		int bh = m_bitmap.GetHeight();
-		if (pw == bw && ph == bh) {
-			dc.DrawBitmap(m_bitmap, 0, 0);
-		} else {
-			wxMemoryDC memDC;
-			memDC.SelectObject(m_bitmap);
-			dc.StretchBlit(0, 0, pw, ph, &memDC, 0, 0, bw, bh);
-		}
+	if (pw <= 0 || ph <= 0) {
+		return;
 	}
+	int bw = m_bitmap.GetWidth();
+	int bh = m_bitmap.GetHeight();
+	if (bw <= 0 || bh <= 0) {
+		return;
+	}
+
+	/* Exact-pixel ("tobai") magnification:
+	 * draw only at integral multiples with nearest-neighbour sampling and
+	 * centre the result, so every emulated pixel stays a crisp square. */
+	int sx = pw / bw;
+	int sy = ph / bh;
+	int mul = (sx < sy) ? sx : sy;
+
+	if (mul < 1) {
+		/* Window smaller than the native picture: fall back to a plain fit. */
+		wxMemoryDC memDC;
+		memDC.SelectObject(m_bitmap);
+		dc.StretchBlit(0, 0, pw, ph, &memDC, 0, 0, bw, bh);
+		return;
+	}
+
+	if ((m_scaledMul != mul) || !m_scaled.IsOk() ||
+	    m_scaled.GetWidth() != bw * mul) {
+		wxImage img = m_dispImage.IsOk() ? m_dispImage
+		                                 : m_bitmap.ConvertToImage();
+		img.Rescale(bw * mul, bh * mul, wxIMAGE_QUALITY_NEAREST);
+		m_scaled = wxBitmap(img);
+		m_scaledMul = mul;
+	}
+
+	dc.DrawBitmap(m_scaled, (pw - bw * mul) / 2, (ph - bh * mul) / 2, false);
 }
 
 void Np2Panel::OnSize(wxSizeEvent &evt)
@@ -161,6 +187,22 @@ void Np2Panel::OnKeyDown(wxKeyEvent &evt)
 		Np2Frame *frame = wxDynamicCast(GetParent(), Np2Frame);
 		if (frame) frame->ToggleFullScreen();
 		return;
+	}
+
+	/* Alt + '+' / Alt + '-' : step exact (integer) magnification */
+	if (evt.AltDown()) {
+		if ((key == '+') || (key == WXK_ADD) || (key == WXK_NUMPAD_ADD) ||
+		    ((key == '=') && evt.ShiftDown())) {
+			Np2Frame *frame = wxDynamicCast(GetParent(), Np2Frame);
+			if (frame) frame->StepScreenScale(+1);
+			return;
+		}
+		if ((key == '-') || (key == WXK_SUBTRACT) ||
+		    (key == WXK_NUMPAD_SUBTRACT)) {
+			Np2Frame *frame = wxDynamicCast(GetParent(), Np2Frame);
+			if (frame) frame->StepScreenScale(-1);
+			return;
+		}
 	}
 
 	/* F12: capture mouse toggle (when F12KEY==0) or pass to emulator */

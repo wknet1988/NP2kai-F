@@ -24,8 +24,11 @@ public:
 	bool IsMouseCaptured(void) const { return m_mouseCaptured; }
 
 private:
-	wxImage   m_image;
-	wxBitmap  m_bitmap;
+	wxImage   m_image;      /* raw framebuffer converted to RGB24 */
+	wxImage   m_dispImage;  /* framebuffer after rotation (source for scaling) */
+	wxBitmap  m_bitmap;     /* native-size bitmap (1:1 pixels) */
+	wxBitmap  m_scaled;     /* cached integer-scaled bitmap */
+	int       m_scaledMul;  /* integer factor used for m_scaled, 0 = invalid */
 	bool      m_mouseCaptured;
 	wxPoint   m_lastMousePos;
 

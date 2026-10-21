@@ -292,6 +292,10 @@ wxBEGIN_EVENT_TABLE(Np2Frame, wxFrame)
 	EVT_MENU(ID_SCREEN_X1,   Np2Frame::OnScreenX1)
 	EVT_MENU(ID_SCREEN_X2,   Np2Frame::OnScreenX2)
 	EVT_MENU(ID_SCREEN_X3,   Np2Frame::OnScreenX3)
+	EVT_MENU(ID_SCREEN_X4,   Np2Frame::OnScreenX4)
+	EVT_MENU(ID_SCREEN_X5,   Np2Frame::OnScreenX5)
+	EVT_MENU(ID_SCREEN_ZOOM_IN,  Np2Frame::OnScreenZoomIn)
+	EVT_MENU(ID_SCREEN_ZOOM_OUT, Np2Frame::OnScreenZoomOut)
 	EVT_MENU(ID_SCREEN_FULL, Np2Frame::OnScreenFull)
 	/* Other */
 	EVT_MENU(ID_OTHER_COPY_SCREEN, Np2Frame::OnOtherCopyScreen)
@@ -507,6 +511,14 @@ void Np2Frame::BuildMenuBar(void)
 		scrnMenu->AppendRadioItem(ID_SCREEN_X1,   "&x1 (640x400)");
 		scrnMenu->AppendRadioItem(ID_SCREEN_X2,   "&x2 (1280x800)");
 		scrnMenu->AppendRadioItem(ID_SCREEN_X3,   "&x3 (1920x1200)");
+		scrnMenu->AppendRadioItem(ID_SCREEN_X4,   "&x4 (2560x1600)");
+		scrnMenu->AppendRadioItem(ID_SCREEN_X5,   "&x5 (3200x2000)");
+		scrnMenu->AppendSeparator();
+		scrnMenu->Append(ID_SCREEN_ZOOM_IN,  "Zoom &In",
+		    "Alt + '+' : enlarge by one exact magnification step");
+		scrnMenu->Append(ID_SCREEN_ZOOM_OUT, "Zoom &Out",
+		    "Alt + '-' : shrink by one exact magnification step");
+		scrnMenu->AppendSeparator();
 		scrnMenu->AppendRadioItem(ID_SCREEN_FULL, "&Full Screen");
 		scrnMenu->Check(ID_SCREEN_X1, true);
 		AppendSubArt(menuDisp, scrnMenu, "&Screen Size", wxART_FULL_SCREEN);
@@ -1189,25 +1201,66 @@ static void GetDisplaySize(int scale, int *outW, int *outH)
 	*outH = (portrait ? w : h) * scale;
 }
 
+/* Resize the window so the picture occupies exactly `mul` times its native
+ * size. Combined with the integer-nearest-neighbour painting in Np2Panel this
+ * gives pixel-exact ("tobai") magnification without any blurring. */
+void Np2Frame::SetScreenScale(int mul)
+{
+	if (IsFullScreen()) {
+		return;                 /* full screen sizes itself */
+	}
+	if (mul < 1) mul = 1;
+	if (mul > 8) mul = 8;
+	int w, h;
+	GetDisplaySize(mul, &w, &h);
+	SetClientSize(w, h);
+}
+
+void Np2Frame::StepScreenScale(int dir)
+{
+	int nw, nh;
+	GetDisplaySize(1, &nw, &nh);
+	if (nw <= 0) {
+		return;
+	}
+	int cur = (GetClientSize().x + nw / 2) / nw;   /* current integer factor */
+	if (cur < 1) cur = 1;
+	SetScreenScale(cur + dir);
+}
+
 void Np2Frame::OnScreenX1(wxCommandEvent & /*evt*/)
 {
-	int w, h;
-	GetDisplaySize(1, &w, &h);
-	SetClientSize(w, h);
+	SetScreenScale(1);
 }
 
 void Np2Frame::OnScreenX2(wxCommandEvent & /*evt*/)
 {
-	int w, h;
-	GetDisplaySize(2, &w, &h);
-	SetClientSize(w, h);
+	SetScreenScale(2);
 }
 
 void Np2Frame::OnScreenX3(wxCommandEvent & /*evt*/)
 {
-	int w, h;
-	GetDisplaySize(3, &w, &h);
-	SetClientSize(w, h);
+	SetScreenScale(3);
+}
+
+void Np2Frame::OnScreenX4(wxCommandEvent & /*evt*/)
+{
+	SetScreenScale(4);
+}
+
+void Np2Frame::OnScreenX5(wxCommandEvent & /*evt*/)
+{
+	SetScreenScale(5);
+}
+
+void Np2Frame::OnScreenZoomIn(wxCommandEvent & /*evt*/)
+{
+	StepScreenScale(+1);
+}
+
+void Np2Frame::OnScreenZoomOut(wxCommandEvent & /*evt*/)
+{
+	StepScreenScale(-1);
 }
 
 void Np2Frame::OnScreenFull(wxCommandEvent & /*evt*/)

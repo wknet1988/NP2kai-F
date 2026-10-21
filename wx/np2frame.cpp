@@ -1413,7 +1413,13 @@ void Np2Frame::OnTranslateEngine(wxCommandEvent &evt)
 {
 	wxString cur = wxString::FromUTF8(translate_get_engine());
 	wxTextEntryDialog dlg(this,
-	    wxT("输入翻译引擎命令。\n调用方式： engine <输入文件> <输出文件>\n输入/输出文件均为 UTF-8，每行一条原文/译文。\n留空 = 离线直通（译文等于原文）。"),
+	    wxT("输入翻译引擎命令。\n调用方式： engine <输入文件> <输出文件>\n"
+	        "输入/输出文件均为 UTF-8，每行一条原文/译文。\n\n"
+	        "推荐（内置多后端免费引擎，支持 Google/Bing/百度/有道）：\n"
+	        "  python \"<tr_engine.py 的完整路径>\"\n"
+	        "例如： python \"H:\\\\AI\\\\NP2kai-F\\\\translate\\\\tr_engine.py\"\n"
+	        "后端与密钥在 translate/tr_config.ini 中配置（详见该文件头部说明）。\n\n"
+	        "留空 = 离线直通（译文等于原文，仅验证管线）。"),
 	    wxT("设置翻译引擎"), cur);
 	if (dlg.ShowModal() == wxID_OK) {
 		wxString v = dlg.GetValue().Trim();

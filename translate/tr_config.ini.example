@@ -1,0 +1,37 @@
+# NP2kai 翻译引擎配置模板
+# 复制本文件为 tr_config.ini 后填写；同名 ini 会被 tr_engine.py 自动加载。
+# 也可以改用环境变量（见 tr_engine.py 头部说明），环境变量优先级更高。
+
+[translate]
+
+# 后端顺序（逗号分隔）。第一个可用的优先；某行失败自动切换下一个。
+#   google = Google 翻译（免密钥，国内可能需改 google_host）
+#   bing   = 微软 Bing 翻译（免密钥）
+#   baidu  = 百度翻译（需下方 APPID/KEY，免费注册 https://fanyi-api.baidu.com/ ）
+#   youdao = 有道智云（需下方 APPKEY/APPSECRET，免费注册 https://ai.youdao.com/ ）
+backend = baidu,youdao,bing,google
+
+# 源语言 / 目标语言。PC-98 游戏多为日语，可设 src=ja；auto=自动识别。
+src = auto
+dst = zh
+
+# 每行之间的间隔秒数（遵守免费接口频率限制）。百度免费版 1 QPS，建议 >=0.2。
+sleep = 0.2
+
+# 单个后端单次翻译的最大重试次数与退避基数（秒）。
+retries = 3
+retry_delay = 0.5
+
+# 单次 HTTP 超时（秒）。
+timeout = 10
+
+# Google 接口主机。国内网络若被墙，可尝试 translate.google.cn
+google_host = translate.googleapis.com
+
+# 百度翻译凭据（免费注册后「管理控制台」获取）
+baidu_appid =
+baidu_key   =
+
+# 有道智云凭据（免费注册后「应用管理」获取）
+youdao_appkey     =
+youdao_appsecret  =

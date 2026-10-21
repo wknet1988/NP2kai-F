@@ -3,6 +3,7 @@ build-*/
 *.o
 *.a
 *.dylib
+translate/tr_cache.json
 *.so
 *.dll
 *.in

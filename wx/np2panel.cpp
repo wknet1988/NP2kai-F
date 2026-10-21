@@ -13,6 +13,8 @@
 #include <wx/dcbuffer.h>
 #include <wx/dcmemory.h>
 #include <wx/image.h>
+#include <wx/font.h>
+#include <translate/translate.h>
 
 wxBEGIN_EVENT_TABLE(Np2Panel, wxPanel)
 	EVT_PAINT(Np2Panel::OnPaint)
@@ -95,6 +97,32 @@ void Np2Panel::UpdateScreen(void)
 	}
 
 	scrnmng_unlockbuf();
+
+	/* Translation overlay: cover original text with its translation.
+	 * Drawn in the native 640x400 surface space, before rotation/scaling,
+	 * so it stays aligned with the emulated text at any zoom level. */
+	if (translate_get_mode() & TR_MODE_OVERLAY) {
+		tr_overlay_t ov[TR_OVERLAY_MAX];
+		int on = translate_get_overlay(ov, TR_OVERLAY_MAX);
+		if (on > 0) {
+			wxBitmap bmp(m_image);
+			wxMemoryDC dc(bmp);
+			dc.SetBrush(*wxBLACK_BRUSH);
+			dc.SetPen(*wxTRANSPARENT_PEN);
+			dc.SetTextForeground(*wxWHITE);
+			for (int i = 0; i < on; i++) {
+				if (!ov[i].ready || !ov[i].tran[0])
+					continue;
+				int fs = ov[i].h - 2;
+				if (fs < 6) fs = 6;
+				wxFont fnt(wxFontInfo(fs).Family(wxFONTFAMILY_DEFAULT));
+				dc.SetFont(fnt);
+				dc.DrawRectangle(ov[i].x, ov[i].y, ov[i].w, ov[i].h);
+				dc.DrawText(wxString::FromUTF8(ov[i].tran), ov[i].x + 1, ov[i].y);
+			}
+			m_image = bmp.ConvertToImage();
+		}
+	}
 
 	/* Apply rotation based on scrnmode bits:
 	 *   0x00 = normal

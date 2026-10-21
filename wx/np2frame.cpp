@@ -25,6 +25,8 @@
 #include <vram/scrnsave.h>
 #include <statsave.h>
 #include <font/font.h>
+#include <translate/translate.h>
+#include "trwnd.h"
 #include <io/iocore.h>   /* for fdc.equip */
 
 #include <wx/artprov.h>
@@ -303,6 +305,10 @@ wxBEGIN_EVENT_TABLE(Np2Frame, wxFrame)
 	EVT_MENU(ID_OTHER_CYCLE_SCREENSHOT, Np2Frame::OnOtherCycleScreenshot)
 	EVT_MENU(ID_OTHER_TEXT_HOOK,   Np2Frame::OnOtherTextHook)
 	EVT_MENU(ID_OTHER_ABOUT,       Np2Frame::OnOtherAbout)
+	EVT_MENU(ID_TR_OVERLAY,         Np2Frame::OnTranslateOverlay)
+	EVT_MENU(ID_TR_WINDOW,          Np2Frame::OnTranslateWindow)
+	EVT_MENU(ID_TR_ENGINE,          Np2Frame::OnTranslateEngine)
+	EVT_MENU(ID_TR_CLEAR,           Np2Frame::OnTranslateClear)
 	/* Redraw / caption hooks (posted from C side via np2frame_requestRedraw etc.) */
 	EVT_MENU(wxID_REFRESH,     Np2Frame::OnRefreshEvent)
 	EVT_MENU(wxID_REFRESH + 1, Np2Frame::OnRefreshEvent)
@@ -320,6 +326,8 @@ Np2Frame::Np2Frame(const wxString &title, const wxPoint &pos, const wxSize &size
 	, m_panel(nullptr)
 	, m_emuTimer(this)
 	, m_cycleScreenshotTimer(this)
+	, m_trTimer(this)
+	, m_trwnd(nullptr)
 	, m_running(true)
 	, m_textHookEnabled(false)
 	, m_cycleScreenshotEnabled(np2oscfg.cycle_shot_enabled != 0)
@@ -348,6 +356,12 @@ Np2Frame::Np2Frame(const wxString &title, const wxPoint &pos, const wxSize &size
 	/* Menu */
 	BuildMenuBar();
 
+	/* Translation module */
+	translate_init();
+	translate_set_redraw_cb(np2frame_requestRedraw);
+	Bind(wxEVT_TIMER, &Np2Frame::OnTranslateTimer, this, m_trTimer.GetId());
+	m_trTimer.Start(400);
+
 	/* Status bar */
 	BuildStatusBar();
 
@@ -374,7 +388,9 @@ Np2Frame::Np2Frame(const wxString &title, const wxPoint &pos, const wxSize &size
 Np2Frame::~Np2Frame()
 {
 	m_emuTimer.Stop();
+	m_trTimer.Stop();
 	np2_multithread_shutdown();
+	translate_term();
 	s_frame = nullptr;
 }
 
@@ -536,10 +552,18 @@ void Np2Frame::BuildMenuBar(void)
 	AppendArt(menuOther, ID_OTHER_COPY_SCREEN, "&Copy Screen\tCtrl+C", "Copy screen to clipboard", wxART_COPY);
 	AppendArt(menuOther, ID_OTHER_PNG_SAVE,    "&PNG Save...", "Save screen as PNG image", wxART_FILE_SAVE_AS);
 	AppendArt(menuOther, ID_OTHER_CYCLE_SCREENSHOT, "Cycle Screenshot", "Periodically save screenshots to a file", wxART_REDO, wxITEM_CHECK);
-	AppendArt(menuOther, ID_OTHER_TEXT_HOOK,   "&Text ROM Hook...", "Start/stop text ROM hook", wxART_LIST_VIEW, wxITEM_CHECK);
 	menuOther->AppendSeparator();
 	AppendArt(menuOther, ID_OTHER_ABOUT,       "&About...", "Show about dialog", wxART_HELP);
 	bar->Append(menuOther, "&Other");
+
+	/* --- Translate --- */
+	wxMenu *menuTr = new wxMenu;
+	menuTr->AppendCheckItem(ID_TR_OVERLAY, "&覆盖原文\tCtrl+T", "Overlay: cover original text with its translation");
+	menuTr->AppendCheckItem(ID_TR_WINDOW,  "&桌面翻译窗\tCtrl+W", "Desktop window listing captured original + translation");
+	menuTr->AppendSeparator();
+	menuTr->Append(ID_TR_ENGINE, "&设置翻译引擎...", "Set external translation command (engine <infile> <outfile>)");
+	menuTr->Append(ID_TR_CLEAR,  "&清空译文", "Clear translation cache and window");
+	bar->Append(menuTr, "&翻译");
 
 	SetMenuBar(bar);
 	UpdateMenuStatus();
@@ -817,7 +841,8 @@ void Np2Frame::UpdateMenuStatus(void)
 	}
 
 	/* Other */
-	bar->Check(ID_OTHER_TEXT_HOOK, m_textHookEnabled);
+	bar->Check(ID_TR_OVERLAY, (translate_get_mode() & TR_MODE_OVERLAY) != 0);
+	bar->Check(ID_TR_WINDOW,  (translate_get_mode() & TR_MODE_WINDOW) != 0);
 	bar->Check(ID_OTHER_CYCLE_SCREENSHOT, m_cycleScreenshotEnabled);
 }
 
@@ -1358,6 +1383,60 @@ void Np2Frame::OnOtherTextHook(wxCommandEvent &evt)
 	} else {
 		hook_fontrom_defdisable();
 	}
+}
+
+void Np2Frame::OnTranslateOverlay(wxCommandEvent &evt)
+{
+	tr_mode_t m = translate_get_mode();
+	if (evt.IsChecked()) m = (tr_mode_t)(m | TR_MODE_OVERLAY);
+	else                 m = (tr_mode_t)(m & ~TR_MODE_OVERLAY);
+	translate_set_mode(m);
+	UpdateMenuStatus();
+}
+
+void Np2Frame::OnTranslateWindow(wxCommandEvent &evt)
+{
+	tr_mode_t m = translate_get_mode();
+	if (evt.IsChecked()) m = (tr_mode_t)(m | TR_MODE_WINDOW);
+	else                 m = (tr_mode_t)(m & ~TR_MODE_WINDOW);
+	translate_set_mode(m);
+	if (evt.IsChecked()) {
+		if (!m_trwnd) m_trwnd = new TrWindow(this);
+		m_trwnd->Show(true);
+	} else if (m_trwnd) {
+		m_trwnd->Show(false);
+	}
+	UpdateMenuStatus();
+}
+
+void Np2Frame::OnTranslateEngine(wxCommandEvent &evt)
+{
+	wxString cur = wxString::FromUTF8(translate_get_engine());
+	wxTextEntryDialog dlg(this,
+	    wxT("输入翻译引擎命令。\n调用方式： engine <输入文件> <输出文件>\n输入/输出文件均为 UTF-8，每行一条原文/译文。\n留空 = 离线直通（译文等于原文）。"),
+	    wxT("设置翻译引擎"), cur);
+	if (dlg.ShowModal() == wxID_OK) {
+		wxString v = dlg.GetValue().Trim();
+		if (v.IsEmpty()) {
+			translate_set_engine(NULL);
+		} else {
+			wxCharBuffer buf = v.mb_str(wxConvUTF8);
+			translate_set_engine((const char *)buf);
+		}
+	}
+}
+
+void Np2Frame::OnTranslateClear(wxCommandEvent &evt)
+{
+	(void)evt;
+	translate_clear();
+}
+
+void Np2Frame::OnTranslateTimer(wxTimerEvent &evt)
+{
+	(void)evt;
+	translate_scan_textvram();
+	translate_pump();
 }
 
 void Np2Frame::OnOtherAbout(wxCommandEvent & /*evt*/)

@@ -34,6 +34,7 @@
 #include <vram/palettes.h>
 #include <vram/scrndraw.h>
 #include <vram/vram.h>
+#include <translate/translate.h>
 
 #if defined(SUPPORT_VIDEOFILTER)
 #include <vram/videofilter.h>
@@ -1638,6 +1639,9 @@ static void drawscreen(void) {
     pcstat.screenupdate = scrndraw_draw((UINT8)(pcstat.screenupdate & 2));
     drawcount++;
   }
+#ifdef NP2_TRANSLATE
+  translate_scan_textvram();
+#endif
 }
 
 void screendisp(NEVENTITEM item) {

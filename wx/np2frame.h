@@ -9,6 +9,7 @@
 #include <wx/menu.h>
 
 class Np2Panel;
+class TrWindow;
 
 /* IDs for menus */
 enum {
@@ -97,6 +98,12 @@ enum {
 	ID_OTHER_CYCLE_SCREENSHOT,
 	ID_OTHER_TEXT_HOOK,
 	ID_OTHER_ABOUT,
+
+	/* Translate */
+	ID_TR_OVERLAY,
+	ID_TR_WINDOW,
+	ID_TR_ENGINE,
+	ID_TR_CLEAR,
 };
 
 class Np2Frame : public wxFrame
@@ -123,6 +130,8 @@ private:
 	Np2Panel *m_panel;
 	wxTimer   m_emuTimer;
 	wxTimer   m_cycleScreenshotTimer;
+	wxTimer   m_trTimer;
+	TrWindow  *m_trwnd;
 	bool      m_running;
 	bool      m_textHookEnabled;
 	bool      m_cycleScreenshotEnabled;
@@ -184,6 +193,12 @@ private:
 	void OnOtherCycleScreenshot(wxCommandEvent &evt);
 	void OnOtherTextHook(wxCommandEvent &evt);
 	void OnOtherAbout(wxCommandEvent &evt);
+
+	void OnTranslateOverlay(wxCommandEvent &evt);
+	void OnTranslateWindow(wxCommandEvent &evt);
+	void OnTranslateEngine(wxCommandEvent &evt);
+	void OnTranslateClear(wxCommandEvent &evt);
+	void OnTranslateTimer(wxTimerEvent &evt);
 
 	/* Timer: emulation step */
 	void OnEmuTimer(wxTimerEvent &evt);

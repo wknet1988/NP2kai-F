@@ -308,6 +308,7 @@ wxBEGIN_EVENT_TABLE(Np2Frame, wxFrame)
 	EVT_MENU(ID_TR_OVERLAY,         Np2Frame::OnTranslateOverlay)
 	EVT_MENU(ID_TR_WINDOW,          Np2Frame::OnTranslateWindow)
 	EVT_MENU(ID_TR_ENGINE,          Np2Frame::OnTranslateEngine)
+	EVT_MENU(ID_TR_TEST,            Np2Frame::OnTranslateTest)
 	EVT_MENU(ID_TR_CLEAR,           Np2Frame::OnTranslateClear)
 	/* Redraw / caption hooks (posted from C side via np2frame_requestRedraw etc.) */
 	EVT_MENU(wxID_REFRESH,     Np2Frame::OnRefreshEvent)
@@ -562,6 +563,7 @@ void Np2Frame::BuildMenuBar(void)
 	menuTr->AppendCheckItem(ID_TR_WINDOW,  "&桌面翻译窗\tCtrl+W", "Desktop window listing captured original + translation");
 	menuTr->AppendSeparator();
 	menuTr->Append(ID_TR_ENGINE, "&设置翻译引擎...", "Set external translation command (engine <infile> <outfile>)");
+	menuTr->Append(ID_TR_TEST,   "&测试翻译引擎...", "Run engine --test to verify connectivity and show a sample translation");
 	menuTr->Append(ID_TR_CLEAR,  "&清空译文", "Clear translation cache and window");
 	bar->Append(menuTr, "&翻译");
 
@@ -602,11 +604,12 @@ wxMenu *Np2Frame::BuildCdMenu(void)
 
 void Np2Frame::BuildStatusBar(void)
 {
-	wxStatusBar *sb = CreateStatusBar(3);
-	int widths[] = {-1, 24, 24};
-	sb->SetStatusWidths(3, widths);
+	wxStatusBar *sb = CreateStatusBar(4);
+	int widths[] = {-1, 24, 24, 200};
+	sb->SetStatusWidths(4, widths);
 
 	SetStatusText("NP2kai wx", 0);
+	UpdateTranslateStatus();
 
 	m_volIcon = new wxStaticBitmap(sb, wxID_ANY, wxBitmap(s_vol_xpm));
 	m_speedIcon = new wxStaticBitmap(sb, wxID_ANY, wxBitmap(s_speed_xpm));
@@ -649,6 +652,26 @@ void Np2Frame::UpdateStatusBar(void)
 		m_volIcon->SetToolTip(wxString::Format("Vol: %d", np2cfg.vol_master));
 	}
 	if (m_speedIcon) m_speedIcon->SetToolTip(wxString::Format("Speed: x%.1f", (float)np2cfg.emuspeed / 100.0f));
+}
+
+void Np2Frame::UpdateTranslateStatus(void)
+{
+	wxStatusBar *sb = GetStatusBar();
+	if (!sb) return;
+	tr_mode_t m = translate_get_mode();
+	wxString mode;
+	if (m == TR_MODE_OFF) {
+		mode = wxT("关");
+	} else {
+		if (m & TR_MODE_OVERLAY) mode += wxT("覆盖");
+		if (m & TR_MODE_WINDOW) {
+			if (!mode.IsEmpty()) mode += wxT("+");
+			mode += wxT("窗");
+		}
+	}
+	const char *eng = translate_get_engine();
+	wxString engState = (eng && eng[0]) ? wxT("引擎已配") : wxT("引擎未配");
+	SetStatusText(wxString::Format(wxT("翻译: %s · %s"), mode, engState), 3);
 }
 
 /* ---- emulation timer / redraw ---- */
@@ -1392,6 +1415,7 @@ void Np2Frame::OnTranslateOverlay(wxCommandEvent &evt)
 	else                 m = (tr_mode_t)(m & ~TR_MODE_OVERLAY);
 	translate_set_mode(m);
 	UpdateMenuStatus();
+	UpdateTranslateStatus();
 }
 
 void Np2Frame::OnTranslateWindow(wxCommandEvent &evt)
@@ -1407,11 +1431,23 @@ void Np2Frame::OnTranslateWindow(wxCommandEvent &evt)
 		m_trwnd->Show(false);
 	}
 	UpdateMenuStatus();
+	UpdateTranslateStatus();
 }
 
 void Np2Frame::OnTranslateEngine(wxCommandEvent &evt)
 {
 	wxString cur = wxString::FromUTF8(translate_get_engine());
+	if (cur.IsEmpty()) {
+		/* turnkey default: locate tr_engine.py next to the executable */
+		wxString dir = wxFileName(wxStandardPaths::Get().GetExecutablePath()).GetPath();
+		wxString c1 = dir + wxT("/translate/tr_engine.py");
+		wxString c2 = dir + wxT("/../translate/tr_engine.py");
+		wxString script;
+		if (wxFileExists(c1))       script = c1;
+		else if (wxFileExists(c2))  script = c2;
+		if (!script.IsEmpty())
+			cur = wxT("python \"") + script + wxT("\"");
+	}
 	wxTextEntryDialog dlg(this,
 	    wxT("输入翻译引擎命令。\n调用方式： engine <输入文件> <输出文件>\n"
 	        "输入/输出文件均为 UTF-8，每行一条原文/译文。\n\n"
@@ -1429,13 +1465,34 @@ void Np2Frame::OnTranslateEngine(wxCommandEvent &evt)
 			wxCharBuffer buf = v.mb_str(wxConvUTF8);
 			translate_set_engine((const char *)buf);
 		}
+		UpdateTranslateStatus();
 	}
+}
+
+void Np2Frame::OnTranslateTest(wxCommandEvent &evt)
+{
+	const char *engine = translate_get_engine();
+	if (!engine || !engine[0]) {
+		wxMessageBox(wxT("尚未设置翻译引擎。\n请先用「设置翻译引擎...」配置 tr_engine.py 的路径。"),
+		             wxT("翻译引擎测试"), wxOK | wxICON_INFORMATION);
+		return;
+	}
+	wxString cmd = wxString::FromUTF8(engine) + wxT(" --test \"こんにちは世界\"");
+	wxArrayString out, err;
+	long rc = wxExecute(cmd, out, err, wxEXEC_SYNC);
+	wxString msg;
+	for (size_t i = 0; i < out.GetCount(); i++) msg += out[i] + wxT("\n");
+	for (size_t i = 0; i < err.GetCount(); i++) msg += wxT("[err] ") + err[i] + wxT("\n");
+	if (msg.IsEmpty())
+		msg = wxString::Format(wxT("(无输出，退出码 %ld)"), rc);
+	wxMessageBox(msg, wxT("翻译引擎测试"), wxOK | wxICON_INFORMATION);
 }
 
 void Np2Frame::OnTranslateClear(wxCommandEvent &evt)
 {
 	(void)evt;
 	translate_clear();
+	UpdateTranslateStatus();
 }
 
 void Np2Frame::OnTranslateTimer(wxTimerEvent &evt)

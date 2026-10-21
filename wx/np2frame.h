@@ -103,6 +103,7 @@ enum {
 	ID_TR_OVERLAY,
 	ID_TR_WINDOW,
 	ID_TR_ENGINE,
+	ID_TR_TEST,
 	ID_TR_CLEAR,
 };
 
@@ -117,6 +118,7 @@ public:
 	void UpdateCaption(UINT8 flag);
 	void UpdateMenuStatus(void);
 	void UpdateStatusBar(void);
+	void UpdateTranslateStatus(void);
 
 	Np2Panel *GetPanel(void) { return m_panel; }
 	bool IsRunning(void)     const { return m_running; }
@@ -197,6 +199,7 @@ private:
 	void OnTranslateOverlay(wxCommandEvent &evt);
 	void OnTranslateWindow(wxCommandEvent &evt);
 	void OnTranslateEngine(wxCommandEvent &evt);
+	void OnTranslateTest(wxCommandEvent &evt);
 	void OnTranslateClear(wxCommandEvent &evt);
 	void OnTranslateTimer(wxTimerEvent &evt);
 

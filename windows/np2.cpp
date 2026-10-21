@@ -2330,6 +2330,43 @@ static void OnCommand(HWND hWnd, WPARAM wParam)
 	sysmng_update(update);
 }
 
+
+// ---- integer scaling step (Alt + '+' / Alt + '-') ----
+// scrnstat.multiple uses 1/8 units: 8=1x, 16=2x, 24=3x, 32=4x, 40=5x, 48=6x
+static void np2_scrnmul_step(int dir) {
+
+	if (scrnmng_isfullscreen()) {
+		return;
+	}
+	if (GetWindowLong(g_hWndMain, GWL_STYLE) & WS_MINIMIZE) {
+		return;
+	}
+	int m = scrnmng_getmultiple();
+	if (m < 1) {
+		m = 8;
+	}
+	int level = (m + 7) / 8;		// current integer level
+	if (dir > 0) {
+		level++;
+	}
+	else {
+		level--;
+	}
+	if (level < 1) {
+		level = 1;
+	}
+	if (level > 6) {			// cap at 6x
+		level = 6;
+	}
+	int newmul = level * 8;
+	if (newmul != m) {
+		np2_multithread_EnterCriticalSection();
+		scrnmng_setmultiple(newmul);
+		np2_multithread_LeaveCriticalSection();
+		sysmng_update(SYS_UPDATEOSCFG);
+	}
+}
+
 LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 
 	PAINTSTRUCT	ps;
@@ -2871,6 +2908,17 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 			break;
 
 		case WM_SYSKEYDOWN:
+		// integer scaling: Alt + '+' / Alt + '-' (numpad too)
+		if (lParam & 0x20000000) {
+			if ((wParam == VK_OEM_PLUS) || (wParam == VK_ADD)) {
+				np2_scrnmul_step(+1);
+				break;
+			}
+			if ((wParam == VK_OEM_MINUS) || (wParam == VK_SUBTRACT)) {
+				np2_scrnmul_step(-1);
+				break;
+			}
+		}
 			autokey_sendbufferpos = autokey_sendbufferlen; // コピペ強制終了 np21w ver0.86 rev22
 #ifdef HOOK_SYSKEY
 			if (GetAsyncKeyState (VK_RMENU) >> ((sizeof(SHORT) * 8) - 1)) {	// np21w ver0.86 rev6	

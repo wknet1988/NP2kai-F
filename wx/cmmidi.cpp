@@ -12,6 +12,11 @@
 #include "soundmng.h"
 
 #include <sys/time.h>
+#include <fcntl.h>
+/* O_NONBLOCK is a POSIX flag not provided by the Windows CRT */
+#ifndef O_NONBLOCK
+#define O_NONBLOCK 0
+#endif
 
 #if defined(VERMOUTH_LIB)
 const char cmmidi_vermouth[] = "VERMOUTH";

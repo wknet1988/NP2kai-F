@@ -20,6 +20,12 @@
 
 #include <sys/types.h>
 #include <pwd.h>
+/* Windows CRT compatibility: 2-argument POSIX mkdir() */
+#if defined(_WINDOWS)
+#include <direct.h>
+static __inline int np2_mkdir(const char *path, unsigned mode) { (void)mode; return _mkdir(path); }
+#define mkdir np2_mkdir
+#endif
 #include <unistd.h>
 
 /* ---- helper for memory switches / dipswitches ---- */

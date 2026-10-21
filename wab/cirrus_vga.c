@@ -5095,7 +5095,7 @@ void pc98_cirrus_vga_save()
 	array_write(f, pos, &cirrusvga_wab_42e1, sizeof(cirrusvga_wab_42e1));
 	
 	TRACEOUT(("CIRRUS VGA datalen=%d, (max %d bytes)", pos, sizeof(cirrusvga_statsavebuf)));
-#if defined(_WIN32)
+#if defined(NP2_WIN)
 	// テスト用
 	if(pos > sizeof(cirrusvga_statsavebuf)){
 		MessageBox(NULL, _T("State save: Buffer Full"), _T("Warning"), 0);
@@ -5474,7 +5474,7 @@ void ConvertYUV2RGB(int width, unsigned char *srcYUV16, unsigned char *dstRGB32L
 	}
 }
 
-#if defined(_WIN32)
+#if defined(NP2_WIN)
 static HPALETTE cirrusvga_hPalette = NULL;
 static HPALETTE cirrusvga_oldPalette = NULL;
 #endif
@@ -5492,7 +5492,7 @@ int cirrusvga_drawGraphic(){
 #endif
 	int i, j, width, height, bpp;
 	uint32_t_ line_offset = 0;
-#if defined(_WIN32)
+#if defined(NP2_WIN)
 	LOGPALETTE * lpPalette;
 	HDC hdc = np2wabwnd.hDCBuf;
 #endif

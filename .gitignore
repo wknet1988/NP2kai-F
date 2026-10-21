@@ -53,3 +53,6 @@ GEMINI.md
 AGENTS.md
 
 build_*/
+
+# WorkBuddy local workspace (build cache / scratch)
+.workbuddy/

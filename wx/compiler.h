@@ -7,7 +7,9 @@
  * pull in the real wxWidgets wx/compiler.h first (before our port guard),
  * so that wxCHECK_GCC_VERSION is defined when wx/defs.h needs it. */
 #ifndef _WX_COMPILER_H_
+#if defined(__GNUC__) || defined(__clang__)
 #include_next "wx/compiler.h"
+#endif
 #endif
 
 #ifndef NP2_WX_COMPILER_H

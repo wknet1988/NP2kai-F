@@ -11,6 +11,21 @@
 #include <string.h>
 
 #include <dosio.h>
+/* POSIX helpers missing from the Windows CRT (build compatibility) */
+#if defined(_WINDOWS)
+#ifndef S_ISLNK
+#define S_ISLNK(m) 0
+#endif
+static __inline int np2_fsync(int fd) { (void)fd; return 0; }
+#define fsync np2_fsync
+static __inline int np2_futimes(int fd, const struct timeval tv[2]) { (void)fd; (void)tv; return -1; }
+#define futimes np2_futimes
+static __inline int np2_lstat(const char *path, struct stat *st) { return stat(path, st); }
+#define lstat np2_lstat
+#include <direct.h>
+static __inline int np2_mkdir(const char *path, unsigned mode) { (void)mode; return _mkdir(path); }
+#define mkdir np2_mkdir
+#endif
 
 static OEMCHAR  curpath[MAX_PATH] = OEMTEXT("./");
 static OEMCHAR *curfilep = curpath + 2;
